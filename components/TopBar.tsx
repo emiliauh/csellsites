@@ -13,7 +13,6 @@ export default function TopBar() {
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-2xl bg-white/10 grid place-items-center">📍</div>
             <span className="font-semibold">Canada Cell Sites</span>
-            <span className="text-xs opacity-60">Liquid Glass</span>
           </div>
           <div className="w-10" />
         </div>

@@ -11,7 +11,7 @@ export const ALL_TECHS = ["LTE","5GNR","5GDSS","HSPA","GSM"];
 export const DEFAULT_CARRIERS = ["Bell","Rogers","Telus"];
 
 export const useMapStore = create<State>((set) => ({
-  sidebarOpen: true,
+  sidebarOpen: false,
   carriers: [...DEFAULT_CARRIERS],
   techs: [...ALL_TECHS],
   set: (p) => set(p)

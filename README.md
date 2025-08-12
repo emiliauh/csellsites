@@ -12,7 +12,7 @@ npm run dev
 ```
 Create `.env.local`:
 ```
-NEXT_PUBLIC_TILES_URL=https://cancellsites.yaemi.one/tiles/sites/{z}/{x}/{y}.pbf
+NEXT_PUBLIC_TILES_URL=https://cancellsites.yaemi.one/site_data/{z}/{x}/{y}.pbf
 ```
 
 Deploy to Vercel: add the same env var in Project → Settings → Environment Variables.

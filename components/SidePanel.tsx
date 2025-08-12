@@ -6,13 +6,16 @@ const ALL_CARRIERS = [
   "Ice Wireless","TbayTel","Sogetel","Ecotel","Execulink","Xplore Inc."
 ];
 
-export default function SidePanel() {
+export default function SidePanel({ forceOpen = false }: { forceOpen?: boolean }) {
   const { sidebarOpen, carriers, techs, set } = useMapStore();
   const toggle = (arr: string[], v: string) => {
     const s = new Set(arr); s.has(v) ? s.delete(v) : s.add(v); return Array.from(s);
   };
   return (
-    <aside className={`offcanvas fixed md:static left-0 top-[64px] md:top-[64px] h-[calc(100dvh-72px)] w-[85vw] max-w-[360px] md:w-auto z-40 p-4 glass-strong ${sidebarOpen ? "open" : "closed"}`}>
+    <aside className={`offcanvas fixed md:static left-0 top-[64px] md:top-[64px] h-[calc(100dvh-72px)] w-[85vw] max-w-[360px] md:w-auto z-40 p-4 glass-strong ${(forceOpen || sidebarOpen) ? "open" : "closed"}`}>
+      <div className="md:hidden flex justify-end mb-2">
+        <button className="px-2 py-1 rounded bg-white/10" onClick={()=>set({sidebarOpen:false})} aria-label="Close filters">Close</button>
+      </div>
       <h2 className="text-sm font-semibold mb-3">Filters</h2>
       <div className="mb-4">
         <div className="text-xs opacity-60 mb-1">Carriers</div>

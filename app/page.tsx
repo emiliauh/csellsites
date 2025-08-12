@@ -12,7 +12,7 @@ export default function Page() {
     <main>
       <TopBar />
       <section className="relative md:grid md:grid-cols-[360px_1fr] gap-2 px-2">
-        <div className="hidden md:block"><SidePanel /></div>
+        <div className="hidden md:block"><SidePanel forceOpen /></div>
         <div className="md:hidden">
           <SidePanel />
           {sidebarOpen && <div className="fixed inset-0 bg-black/40 z-30" />}
