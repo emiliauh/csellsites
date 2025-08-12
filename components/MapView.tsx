@@ -13,7 +13,15 @@ function Overlays() {
     const layers: L.TileLayer[] = [];
     const add = (pid?: string) => {
       const url = buildTileUrl(ds, pid);
-      const layer = L.tileLayer(url, { tileSize: 512 as any, noWrap: true, maxZoom: 99, opacity: 1, keepBuffer: 2 });
+      const layer = L.tileLayer(url, {
+        tileSize: 512 as any,
+        noWrap: true,
+        maxZoom: 99,
+        keepBuffer: 3,
+        updateWhenIdle: false,
+        updateWhenZooming: true,
+        crossOrigin: true
+      });
       layer.addTo(map);
       layers.push(layer);
     };
@@ -57,9 +65,7 @@ function ResizeOnReadyAndSidebar() {
   const map = useMap();
   const { sidebarOpen } = useMapStore();
   useEffect(() => {
-    map.whenReady(() => {
-      setTimeout(() => map.invalidateSize(), 0);
-    });
+    map.whenReady(() => requestAnimationFrame(() => map.invalidateSize()));
     const onResize = () => map.invalidateSize();
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
@@ -78,10 +84,19 @@ export default function MapView() {
       className="h-[calc(100dvh-64px)] w-full"
       zoomControl={true}
       preferCanvas={true}
+      fadeAnimation={true}
+      zoomAnimation={true}
+      markerZoomAnimation={true}
+      updateWhenIdle={false}
+      updateWhenZooming={true}
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        crossOrigin={true}
+        updateWhenIdle={false}
+        updateWhenZooming={true}
+        keepBuffer={3}
       />
       <Overlays />
       <ClickHandler />

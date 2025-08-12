@@ -50,3 +50,26 @@ html, body, #__next {
   transform: translateX(0%);
   opacity: 1;
 }
+
+
+/* ---- FIX: Tailwind preflight sets img { max-width:100% } which breaks Leaflet tiles.
+   Override for all map images/tiles to avoid scaling and gaps (black stripes). ---- */
+.leaflet-container img {
+  max-width: none !important;
+}
+.leaflet-container .leaflet-tile,
+.leaflet-container .leaflet-marker-icon,
+.leaflet-container .leaflet-image-layer {
+  max-width: none !important;
+  max-height: none !important;
+}
+.leaflet-container .leaflet-tile {
+  width: 256px;   /* Leaflet handles pixel ratio; don't let CSS auto-scale */
+  height: 256px;
+}
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .leaflet-container .leaflet-tile {
+    width: 512px;
+    height: 512px;
+  }
+}
