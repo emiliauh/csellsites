@@ -1,18 +1,26 @@
 
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MapContainer, TileLayer, useMap } from "react-leaflet";
 const MapAny: any = MapContainer;
 const TileAny: any = TileLayer;
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { useMapStore } from "@/lib/store";
-import Supercluster from "supercluster";
 import { VectorTile } from "@mapbox/vector-tile";
 import Protobuf from "pbf";
 import * as cover from "@mapbox/tile-cover";
 import ClusteredMarkers from "./ClusteredMarkers";
 import { getTile, setTile } from "@/lib/tileCache";
+
+// Fix default marker assets
+const DefaultIcon = L.icon({
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+  iconSize: [25,41], iconAnchor: [12,41]
+});
+(L.Marker as any).prototype.options.icon = DefaultIcon;
 
 const TILES_URL = process.env.NEXT_PUBLIC_TILES_URL || "https://cancellsites.yaemi.one/site_data/{z}/{x}/{y}.pbf";
 const LAYER_NAME = process.env.NEXT_PUBLIC_TILES_LAYER || "site_data";
@@ -25,15 +33,19 @@ type Feature = {
 
 function useBbox(map: any){
   const [bbox, setBbox] = useState<[number,number,number,number] | null>(null);
+  const timer = useRef<any>(null);
   useEffect(()=>{
     if(!map) return;
-    const update = () => {
-      const b = map.getBounds();
-      setBbox([b.getWest(), b.getSouth(), b.getEast(), b.getNorth()]);
+    const schedule = () => {
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(() => {
+        const b = map.getBounds();
+        setBbox([b.getWest(), b.getSouth(), b.getEast(), b.getNorth()]);
+      }, 150);
     };
-    update();
-    map.on("moveend zoomend", update);
-    return () => { map.off("moveend zoomend", update); };
+    schedule();
+    map.on("moveend zoomend", schedule);
+    return () => { map.off("moveend zoomend", schedule); if(timer.current) clearTimeout(timer.current); };
   }, [map]);
   return bbox;
 }
@@ -45,7 +57,7 @@ function replaceTemplate(z:number,x:number,y:number){
 async function fetchTile(z:number,x:number,y:number, signal: AbortSignal): Promise<Uint8Array | null>{
   const cached = getTile(z,x,y);
   if(cached) return cached;
-  const res = await fetch(replaceTemplate(z,x,y), { cache: "no-store", signal });
+  const res = await fetch(replaceTemplate(z,x,y), { cache: "force-cache", signal });
   if(!res.ok) return null;
   const buf = new Uint8Array(await res.arrayBuffer());
   setTile(z,x,y, buf);
@@ -81,45 +93,48 @@ function useViewportFeatures(map: any, carriers: string[], techs: string[]){
     const ac = new AbortController();
     ctrl.current = ac;
 
-    
-(async () => {
-  const zoom = map.getZoom();
-  const z = Math.max(5, Math.min(14, Math.round(zoom)));
-  if (!bbox) return;
-  const [west, south, east, north] = bbox;
+    (async () => {
+      const zoom = map.getZoom();
+      const z = Math.max(5, Math.min(13, Math.round(zoom))); // cap to 13 to protect tile server
+      const [west, south, east, north] = bbox;
+      const poly: any = { type: "Polygon", coordinates: [[[west, south],[east, south],[east, north],[west, north],[west, south]]] };
+      const tiles = cover.tiles(poly, { min_zoom: z, max_zoom: z }) as [number,number,number][];
 
-  // tiles covering bbox (single-zoom cover)
-  const gj: any = { type: "Polygon", coordinates: [[[west, south],[east, south],[east, north],[west, north],[west, south]]] };
-  const tiles = cover.tiles(gj, { min_zoom: z, max_zoom: z }) as [number,number,number][];
+      const carriersL = carriers.map(c=>c.toLowerCase());
+      const techsL = techs.map(t=>t.toLowerCase());
 
-  const results: Feature[] = [];
-  for (const t of tiles) {
-    const [x, y] = t;
-    try {
-      const buf = await fetchTile(z, x, y, ac.signal);
-      if (!buf) continue;
-      const feats = decodeFeatures(buf, x, y, z);
-      results.push(...feats);
-    } catch {}
-  }
+      setFeatures([]);
+      const results: Feature[] = [];
 
-  // filter to bbox + user filters
-  const carriersL = carriers.map(c=>c.toLowerCase());
-  const techsL = techs.map(t=>t.toLowerCase());
-  const filtered = results.filter(f => {
-    const [lng, lat] = f.geometry.coordinates;
-    if (lng < west || lng > east || lat < south || lat > north) return false;
-    const props = f.properties || {};
-    const carrier = String(props.carrier || props.operator || "").toLowerCase();
-    const tech = String(props.technology || props.tech || "").toLowerCase();
-    if (carriersL.length && !carriersL.some(c => carrier.includes(c))) return false;
-    if (techsL.length && !techsL.some(t => tech.includes(t))) return false;
-    return true;
-  });
+      const maxConcurrent = 6;
+      let i = 0;
+      async function worker(){
+        while(i < tiles.length && !ac.signal.aborted){
+          const [x,y,zz] = tiles[i++];
+          try{
+            const buf = await fetchTile(zz, x, y, ac.signal);
+            if(!buf) continue;
+            const feats = decodeFeatures(buf, x, y, zz).filter(f => {
+              const [lng, lat] = f.geometry.coordinates;
+              if (lng < west || lng > east || lat < south || lat > north) return false;
+              const p = f.properties || {};
+              const carrier = String(p.carrier || p.operator || p.provider || p.company || "").toLowerCase();
+              const tech = String(p.technology || p.tech || p.network || "").toLowerCase();
+              if (carriersL.length && !carriersL.some(c => carrier.includes(c))) return false;
+              if (techsL.length && !techsL.some(t => tech.includes(t))) return false;
+              return true;
+            });
+            if (feats.length){
+              results.push(...feats);
+              setFeatures(curr => curr.concat(feats));
+            }
+          } catch {}
+        }
+      }
+      await Promise.all(new Array(Math.min(maxConcurrent, tiles.length)).fill(0).map(()=>worker()));
+    })();
 
-  setFeatures(filtered);
-})();
-return () => ac.abort();
+    return () => ac.abort();
   }, [bbox?.join(","), map, carriers.join(","), techs.join(",")]);
 
   return { bbox, features };
@@ -129,11 +144,11 @@ function SitesLayer(){
   const map = useMap();
   const { carriers, techs, sidebarOpen } = useMapStore();
   const { features } = useViewportFeatures(map, carriers, techs);
+  const zoom = map.getZoom();
 
-  // Resize after panel toggle
   useEffect(()=>{ setTimeout(()=>map.invalidateSize(), 250); }, [sidebarOpen, map]);
 
-  return <ClusteredMarkers features={features} />;
+  return <ClusteredMarkers features={features} zoom={zoom} declusterAt={13} />;
 }
 
 export default function MapView(){
