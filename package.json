@@ -19,7 +19,7 @@
     "pbf": "^3.2.1",
     "@mapbox/tilebelt": "^1.0.2",
     "supercluster": "^8.0.1",
-    "react-leaflet-cluster": "^2.6.0"
+    "react-leaflet-cluster": "^2.5.0"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.20",
