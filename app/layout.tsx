@@ -1,8 +1,8 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Canada Cell Sites — Clean UI",
-  description: "Sleek Canadian cell site map using OpenStreetMap overlays."
+  title: "Canada Cell Sites",
+  description: "Sleek Canadian cell site map with liquid glass UI."
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

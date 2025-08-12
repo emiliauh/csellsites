@@ -1,11 +1,15 @@
 import { create } from "zustand";
 
+export type Provider = { pid: string; name: string };
+
 type State = {
   ds: string;
   showBell: boolean;
   showRogers: boolean;
   showTelus: boolean;
-  pidOther: string | null;
+  otherPids: string[];
+  providers: Provider[];     // catalog from pid-map.php
+  sidebarOpen: boolean;
   set: (p: Partial<State>) => void;
 };
 
@@ -14,6 +18,8 @@ export const useMapStore = create<State>((set) => ({
   showBell: true,
   showRogers: true,
   showTelus: true,
-  pidOther: "0",
+  otherPids: [],
+  providers: [],
+  sidebarOpen: true,
   set: (p) => set(p)
 }));

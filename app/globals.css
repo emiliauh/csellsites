@@ -28,3 +28,25 @@ html, body, #__next {
 }
 .btn:hover { background: rgba(255,255,255,0.1); }
 .btn:active { transform: translateY(1px); }
+
+
+/* --- enhanced glass + panel animations --- */
+.glass-strong {
+  background: linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0.06));
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow: 0 10px 40px rgba(0,0,0,0.35);
+}
+
+.offcanvas {
+  transition: transform .35s ease, opacity .35s ease;
+}
+.offcanvas.closed {
+  transform: translateX(-100%);
+  opacity: .0;
+}
+.offcanvas.open {
+  transform: translateX(0%);
+  opacity: 1;
+}

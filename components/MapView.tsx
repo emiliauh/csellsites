@@ -7,32 +7,30 @@ import { buildTileUrl } from "@/lib/buildTileUrl";
 
 function Overlays() {
   const map = useMap();
-  const { ds, showBell, showRogers, showTelus, pidOther } = useMapStore();
+  const { ds, showBell, showRogers, showTelus, otherPids } = useMapStore();
 
   useEffect(() => {
     const layers: L.TileLayer[] = [];
-
     const add = (pid?: string) => {
       const url = buildTileUrl(ds, pid);
-      const layer = L.tileLayer(url, { tileSize: 512 as any, noWrap: true, maxZoom: 99 });
+      const layer = L.tileLayer(url, { tileSize: 512 as any, noWrap: true, maxZoom: 99, opacity: 1 });
       layer.addTo(map);
       layers.push(layer);
     };
-
     if (showBell) add("1");
     if (showRogers) add("3");
     if (showTelus) add("4");
-    if (pidOther && pidOther !== "0") add(pidOther);
+    otherPids.forEach(pid => add(pid));
 
     return () => { layers.forEach(l => map.removeLayer(l)); };
-  }, [map, ds, showBell, showRogers, showTelus, pidOther]);
+  }, [map, ds, showBell, showRogers, showTelus, otherPids]);
 
   return null;
 }
 
 function ClickHandler() {
   const map = useMap();
-  const { ds, showBell, showRogers, showTelus, pidOther } = useMapStore();
+  const { ds, showBell, showRogers, showTelus, otherPids } = useMapStore();
 
   useMapEvents({
     click: async (e) => {
@@ -45,13 +43,22 @@ function ClickHandler() {
       if (showBell) params.append("pid[]", "1");
       if (showRogers) params.append("pid[]", "3");
       if (showTelus) params.append("pid[]", "4");
-      if (pidOther && pidOther !== "0") params.append("pid[]", pidOther);
+      otherPids.forEach(pid => params.append("pid[]", pid));
 
       const r = await fetch(`/api/point?${params.toString()}`);
       const html = await r.text();
       L.popup().setLatLng(e.latlng).setContent(html).openOn(map);
     }
   });
+  return null;
+}
+
+function ResizeOnSidebarToggle() {
+  const map = useMap();
+  const { sidebarOpen } = useMapStore();
+  useEffect(() => {
+    setTimeout(() => map.invalidateSize(), 350);
+  }, [sidebarOpen, map]);
   return null;
 }
 
@@ -70,6 +77,7 @@ export default function MapView() {
       />
       <Overlays />
       <ClickHandler />
+      <ResizeOnSidebarToggle />
     </MapContainer>
   );
 }
