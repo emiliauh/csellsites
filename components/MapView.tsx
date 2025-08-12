@@ -10,7 +10,7 @@ import { useMapStore } from "@/lib/store";
 import Supercluster from "supercluster";
 import { VectorTile } from "@mapbox/vector-tile";
 import Protobuf from "pbf";
-import * as tilebelt from "@mapbox/tilebelt";
+import * as cover from "@mapbox/tile-cover";
 import ClusteredMarkers from "./ClusteredMarkers";
 import { getTile, setTile } from "@/lib/tileCache";
 
@@ -85,7 +85,8 @@ function useViewportFeatures(map: any, carriers: string[], techs: string[]){
       const zoom = map.getZoom();
       const z = Math.max(5, Math.min(14, Math.round(zoom)));
       // tiles covering bbox
-      const tiles = tilebelt.tiles(bbox as any, z) as [number,number,number][];
+      const gj = { type: "Polygon", coordinates: [[[west, south],[east, south],[east, north],[west, north],[west, south]]] } as any;
+      const tiles = cover.tiles(gj, { min_zoom: z, max_zoom: z }) as [number,number,number][];
       const results: Feature[] = [];
       for(const t of tiles){
         const [x,y] = t;
