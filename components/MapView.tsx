@@ -87,8 +87,6 @@ export default function MapView() {
       fadeAnimation={true}
       zoomAnimation={true}
       markerZoomAnimation={true}
-      updateWhenIdle={false}
-      updateWhenZooming={true}
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
