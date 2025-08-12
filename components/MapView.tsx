@@ -13,7 +13,7 @@ function Overlays() {
     const layers: L.TileLayer[] = [];
     const add = (pid?: string) => {
       const url = buildTileUrl(ds, pid);
-      const layer = L.tileLayer(url, { tileSize: 512 as any, noWrap: true, maxZoom: 99, opacity: 1 });
+      const layer = L.tileLayer(url, { tileSize: 512 as any, noWrap: true, maxZoom: 99, opacity: 1, keepBuffer: 2 });
       layer.addTo(map);
       layers.push(layer);
     };
@@ -53,9 +53,17 @@ function ClickHandler() {
   return null;
 }
 
-function ResizeOnSidebarToggle() {
+function ResizeOnReadyAndSidebar() {
   const map = useMap();
   const { sidebarOpen } = useMapStore();
+  useEffect(() => {
+    map.whenReady(() => {
+      setTimeout(() => map.invalidateSize(), 0);
+    });
+    const onResize = () => map.invalidateSize();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [map]);
   useEffect(() => {
     setTimeout(() => map.invalidateSize(), 350);
   }, [sidebarOpen, map]);
@@ -77,7 +85,7 @@ export default function MapView() {
       />
       <Overlays />
       <ClickHandler />
-      <ResizeOnSidebarToggle />
+      <ResizeOnReadyAndSidebar />
     </MapContainer>
   );
 }
