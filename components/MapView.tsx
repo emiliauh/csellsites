@@ -2,6 +2,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { MapContainer, TileLayer, useMap } from "react-leaflet";
+const MapAny: any = MapContainer;
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { useMapStore } from "@/lib/store";
@@ -72,9 +73,9 @@ function SitesLayer(){
 
 export default function MapView(){
   return (
-    <MapContainer center={[56,-96]} zoom={4} className="h-[calc(100dvh-84px)] w-full" preferCanvas>
+    <MapAny center={[56,-96]} zoom={4} className="h-[calc(100dvh-84px)] w-full" preferCanvas>
       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
       <SitesLayer />
-    </MapContainer>
+    </MapAny>
   );
 }
