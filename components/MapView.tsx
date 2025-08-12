@@ -13,17 +13,19 @@ import * as cover from "@mapbox/tile-cover";
 import ClusteredMarkers from "./ClusteredMarkers";
 import { getTile, setTile } from "@/lib/tileCache";
 
-// Fix default marker assets
+const TILES_URL = process.env.NEXT_PUBLIC_TILES_URL || "https://cancellsites.yaemi.one/site_data/{z}/{x}/{y}.pbf";
+const LAYER_NAME = process.env.NEXT_PUBLIC_TILES_LAYER || "site_data";
+const MAX_CONCURRENCY = 6;
+const MAX_TILE_Z = 15;
+const MIN_TILE_Z = 8;
+
 const DefaultIcon = L.icon({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
   iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
   iconSize: [25,41], iconAnchor: [12,41]
 });
-(L.Marker as any).prototype.options.icon = DefaultIcon;
-
-const TILES_URL = process.env.NEXT_PUBLIC_TILES_URL || "https://cancellsites.yaemi.one/site_data/{z}/{x}/{y}.pbf";
-const LAYER_NAME = process.env.NEXT_PUBLIC_TILES_LAYER || "site_data";
+(L.Marker.prototype as any).options.icon = DefaultIcon;
 
 type Feature = {
   type: "Feature",
@@ -31,21 +33,23 @@ type Feature = {
   properties: Record<string, any>
 };
 
+function useDebounced<T>(value: T, delay = 150){
+  const [v, setV] = useState(value);
+  useEffect(()=>{ const t = setTimeout(()=>setV(value), delay); return () => clearTimeout(t); }, [value, delay]);
+  return v;
+}
+
 function useBbox(map: any){
   const [bbox, setBbox] = useState<[number,number,number,number] | null>(null);
-  const timer = useRef<any>(null);
   useEffect(()=>{
     if(!map) return;
-    const schedule = () => {
-      if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(() => {
-        const b = map.getBounds();
-        setBbox([b.getWest(), b.getSouth(), b.getEast(), b.getNorth()]);
-      }, 150);
+    const update = () => {
+      const b = map.getBounds();
+      setBbox([b.getWest(), b.getSouth(), b.getEast(), b.getNorth()]);
     };
-    schedule();
-    map.on("moveend zoomend", schedule);
-    return () => { map.off("moveend zoomend", schedule); if(timer.current) clearTimeout(timer.current); };
+    update();
+    map.on("moveend zoomend", update);
+    return () => { map.off("moveend zoomend", update); };
   }, [map]);
   return bbox;
 }
@@ -66,7 +70,7 @@ async function fetchTile(z:number,x:number,y:number, signal: AbortSignal): Promi
 
 function decodeFeatures(buf: Uint8Array, x:number, y:number, z:number): Feature[]{
   const vt = new VectorTile(new Protobuf(buf));
-  const layer = vt.layers[LAYER_NAME];
+  const layer = (vt.layers as any)[LAYER_NAME];
   if(!layer) return [];
   const out: Feature[] = [];
   for(let i=0;i<layer.length;i++){
@@ -82,8 +86,29 @@ function decodeFeatures(buf: Uint8Array, x:number, y:number, z:number): Feature[
   return out;
 }
 
+function pLimit(concurrency: number){
+  const queue: Array<() => Promise<void>> = [];
+  let active = 0;
+  const run = async () => {
+    if (active >= concurrency || queue.length === 0) return;
+    active++;
+    const job = queue.shift()!;
+    try { await job(); } finally { active--; run(); }
+  };
+  return function add<T>(fn: () => Promise<T>): Promise<T>{
+    return new Promise<T>((resolve, reject)=>{
+      queue.push(async () => {
+        try { const v = await fn(); resolve(v); } catch(e){ reject(e as any); }
+      });
+      run();
+    });
+  }
+}
+
 function useViewportFeatures(map: any, carriers: string[], techs: string[]){
   const bbox = useBbox(map);
+  const zoom = map.getZoom();
+  const key = useDebounced(`${bbox?.join(",")}|${Math.round(zoom)}|${carriers.join(",")}|${techs.join(",")}`, 150);
   const [features, setFeatures] = useState<Feature[]>([]);
   const ctrl = useRef<AbortController | null>(null);
 
@@ -94,61 +119,56 @@ function useViewportFeatures(map: any, carriers: string[], techs: string[]){
     ctrl.current = ac;
 
     (async () => {
-      const zoom = map.getZoom();
-      const z = Math.max(5, Math.min(13, Math.round(zoom))); // cap to 13 to protect tile server
-      const [west, south, east, north] = bbox;
-      const poly: any = { type: "Polygon", coordinates: [[[west, south],[east, south],[east, north],[west, north],[west, south]]] };
-      const tiles = cover.tiles(poly, { min_zoom: z, max_zoom: z }) as [number,number,number][];
+      const zView = map.getZoom();
+      const z = Math.min(MAX_TILE_Z, Math.max(MIN_TILE_Z, Math.round(zView)));
+      const [west, south, east, north] = bbox!;
+      const gj: any = { type: "Polygon", coordinates: [[[west, south],[east, south],[east, north],[west, north],[west, south]]] };
+      const tiles = (cover.tiles as any)(gj, { min_zoom: z, max_zoom: z }) as [number,number,number][];
+
+      const throttled = pLimit(MAX_CONCURRENCY);
+      const results: Feature[] = [];
 
       const carriersL = carriers.map(c=>c.toLowerCase());
       const techsL = techs.map(t=>t.toLowerCase());
 
-      setFeatures([]);
-      const results: Feature[] = [];
+      const pushAndRender = (newFeats: Feature[]) => {
+        results.push(...newFeats);
+        const partial = results.filter(f => {
+          const [lng, lat] = f.geometry.coordinates;
+          if (lng < west || lng > east || lat < south || lat > north) return false;
+          const props = f.properties || {};
+          const carrier = String(props.carrier || props.operator || props.provider || props.company || "").toLowerCase();
+          const tech = String(props.technology || props.tech || props.network || "").toLowerCase();
+          if (carriersL.length && !carriersL.some(c => carrier.includes(c))) return false;
+          if (techsL.length && !techsL.some(t => tech.includes(t))) return false;
+          return true;
+        });
+        setFeatures(partial);
+      };
 
-      const maxConcurrent = 6;
-      let i = 0;
-      async function worker(){
-        while(i < tiles.length && !ac.signal.aborted){
-          const [x,y,zz] = tiles[i++];
-          try{
-            const buf = await fetchTile(zz, x, y, ac.signal);
-            if(!buf) continue;
-            const feats = decodeFeatures(buf, x, y, zz).filter(f => {
-              const [lng, lat] = f.geometry.coordinates;
-              if (lng < west || lng > east || lat < south || lat > north) return false;
-              const p = f.properties || {};
-              const carrier = String(p.carrier || p.operator || p.provider || p.company || "").toLowerCase();
-              const tech = String(p.technology || p.tech || p.network || "").toLowerCase();
-              if (carriersL.length && !carriersL.some(c => carrier.includes(c))) return false;
-              if (techsL.length && !techsL.some(t => tech.includes(t))) return false;
-              return true;
-            });
-            if (feats.length){
-              results.push(...feats);
-              setFeatures(curr => curr.concat(feats));
-            }
-          } catch {}
-        }
-      }
-      await Promise.all(new Array(Math.min(maxConcurrent, tiles.length)).fill(0).map(()=>worker()));
+      await Promise.all(tiles.map(([x,y]) => throttled(async () => {
+        if (ac.signal.aborted) return;
+        try {
+          const buf = await fetchTile(z, x, y, ac.signal);
+          if (!buf) return;
+          const feats = decodeFeatures(buf, x, y, z);
+          pushAndRender(feats);
+        } catch {}
+      })));
     })();
 
     return () => ac.abort();
-  }, [bbox?.join(","), map, carriers.join(","), techs.join(",")]);
+  }, [key]);
 
-  return { bbox, features };
+  return { features, zoom };
 }
 
 function SitesLayer(){
   const map = useMap();
   const { carriers, techs, sidebarOpen } = useMapStore();
-  const { features } = useViewportFeatures(map, carriers, techs);
-  const zoom = map.getZoom();
-
-  useEffect(()=>{ setTimeout(()=>map.invalidateSize(), 250); }, [sidebarOpen, map]);
-
-  return <ClusteredMarkers features={features} zoom={zoom} declusterAt={13} />;
+  const { features, zoom } = useViewportFeatures(map, carriers, techs);
+  useEffect(()=>{ setTimeout(()=>map.invalidateSize(), 200); }, [sidebarOpen, map]);
+  return <ClusteredMarkers features={features} zoom={zoom} />;
 }
 
 export default function MapView(){
