@@ -64,7 +64,7 @@ export default function ClusteredMarkers({ features }: Props){
           className: ""
         });
         return (
-          <Marker key={`cl-${i}`} position={[lat, lng]} options={{ icon: icon as any }}
+          <Marker key={`cl-${i}`} position={[lat, lng]} {...({ icon } as any)}
             eventHandlers={{ click: () => {
               const expansionZoom = Math.min(index.getClusterExpansionZoom(c.id), 18);
               map.setView([lat, lng], expansionZoom, { animate: true });
