@@ -1,25 +1,18 @@
 import { create } from "zustand";
 
-export type Provider = { pid: string; name: string };
-
 type State = {
-  ds: string;
-  showBell: boolean;
-  showRogers: boolean;
-  showTelus: boolean;
-  otherPids: string[];
-  providers: Provider[];     // catalog from pid-map.php
   sidebarOpen: boolean;
+  carriers: string[];
+  techs: string[];
   set: (p: Partial<State>) => void;
 };
 
+export const ALL_TECHS = ["LTE","5GNR","5GDSS","HSPA","GSM"];
+export const DEFAULT_CARRIERS = ["Bell","Rogers","Telus"];
+
 export const useMapStore = create<State>((set) => ({
-  ds: "0",
-  showBell: true,
-  showRogers: true,
-  showTelus: true,
-  otherPids: [],
-  providers: [],
   sidebarOpen: true,
+  carriers: [...DEFAULT_CARRIERS],
+  techs: [...ALL_TECHS],
   set: (p) => set(p)
 }));

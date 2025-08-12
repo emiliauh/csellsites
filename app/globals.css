@@ -2,74 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: dark;
-}
+:root { color-scheme: dark; }
+body { @apply bg-neutral-950 text-neutral-100; }
 
-html, body, #__next {
-  height: 100%;
-}
-
-.leaflet-container {
-  background: #0b0b0b;
-}
-
-.glass {
-  background: radial-gradient(125% 125% at 50% 0%, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.06) 40%, rgba(255,255,255,0.03) 100%);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,0.08);
-  box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset, 0 10px 30px rgba(0,0,0,0.25);
-}
-
-.btn {
-  @apply inline-flex items-center gap-2 rounded-2xl px-3 py-2 text-sm transition;
-  background: rgba(255,255,255,0.06);
-}
-.btn:hover { background: rgba(255,255,255,0.1); }
-.btn:active { transform: translateY(1px); }
-
-
-/* --- enhanced glass + panel animations --- */
 .glass-strong {
-  background: linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0.06));
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.06));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255,255,255,0.12);
   box-shadow: 0 10px 40px rgba(0,0,0,0.35);
+  border-radius: 16px;
 }
+.offcanvas { transition: transform .35s ease, opacity .35s ease; }
+.offcanvas.closed { transform: translateX(-100%); opacity: 0; }
+.offcanvas.open { transform: translateX(0%); opacity: 1; }
 
-.offcanvas {
-  transition: transform .35s ease, opacity .35s ease;
-}
-.offcanvas.closed {
-  transform: translateX(-100%);
-  opacity: .0;
-}
-.offcanvas.open {
-  transform: translateX(0%);
-  opacity: 1;
-}
-
-
-/* ---- FIX: Tailwind preflight sets img { max-width:100% } which breaks Leaflet tiles.
-   Override for all map images/tiles to avoid scaling and gaps (black stripes). ---- */
-.leaflet-container img {
-  max-width: none !important;
-}
+/* Leaflet CSS fixes */
+@import "leaflet/dist/leaflet.css";
+.leaflet-container img { max-width: none !important; }
 .leaflet-container .leaflet-tile,
 .leaflet-container .leaflet-marker-icon,
-.leaflet-container .leaflet-image-layer {
-  max-width: none !important;
-  max-height: none !important;
-}
-.leaflet-container .leaflet-tile {
-  width: 256px;   /* Leaflet handles pixel ratio; don't let CSS auto-scale */
-  height: 256px;
-}
-@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
-  .leaflet-container .leaflet-tile {
-    width: 512px;
-    height: 512px;
-  }
-}
+.leaflet-container .leaflet-image-layer { max-width: none !important; max-height: none !important; }
+.leaflet-container { background: #0a0a0a; }

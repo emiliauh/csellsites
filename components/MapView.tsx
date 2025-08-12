@@ -1,104 +1,66 @@
 "use client";
-import { MapContainer, TileLayer, useMap, useMapEvents } from "react-leaflet";
+import dynamic from "next/dynamic";
+import { MapContainer, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
+import "leaflet.vectorgrid";
 import { useEffect } from "react";
 import { useMapStore } from "@/lib/store";
-import { buildTileUrl } from "@/lib/buildTileUrl";
 
-function Overlays() {
+const TILES_URL = process.env.NEXT_PUBLIC_TILES_URL || "https://cancellsites.yaemi.one/tiles/sites/{z}/{x}/{y}.pbf";
+
+const colorByTech = (t?: string) => {
+  if (!t) return "#9aa0a6";
+  const u = t.toUpperCase();
+  if (u.startsWith("5G")) return "#8a5cff";
+  if (u.includes("LTE") || u === "4G") return "#22c55e";
+  if (u.includes("HSPA") || u.includes("UMTS") || u === "3G") return "#2563eb";
+  if (u.includes("GSM") || u === "2G") return "#e11d48";
+  return "#9aa0a6";
+};
+
+function SitesLayer() {
   const map = useMap();
-  const { ds, showBell, showRogers, showTelus, otherPids } = useMapStore();
+  const { carriers, techs, sidebarOpen } = useMapStore();
 
   useEffect(() => {
-    const layers: L.TileLayer[] = [];
-    const add = (pid?: string) => {
-      const url = buildTileUrl(ds, pid);
-      const layer = L.tileLayer(url, {
-        tileSize: 512 as any,
-        noWrap: true,
-        maxZoom: 99,
-        keepBuffer: 3,
-        updateWhenIdle: false,
-        updateWhenZooming: true,
-        crossOrigin: true
-      });
-      layer.addTo(map);
-      layers.push(layer);
-    };
-    if (showBell) add("1");
-    if (showRogers) add("3");
-    if (showTelus) add("4");
-    otherPids.forEach(pid => add(pid));
+    const vg: any = (L as any).vectorGrid.protobuf(TILES_URL, {
+      rendererFactory: L.canvas.tile,
+      vectorTileLayerStyles: {
+        sites: (p: any) => {
+          const cOK = carriers.length ? carriers.includes(p.carrier) : true;
+          const tOK = techs.length ? techs.includes(p.technology) : true;
+          if (!(cOK && tOK)) return { radius: 0, fillOpacity: 0, opacity: 0 };
+          return { radius: 3, weight: 0, fillOpacity: .85, fillColor: colorByTech(p.technology) };
+        }
+      },
+      interactive: true,
+      getFeatureId: (f: any) => f.id,
+      maxNativeZoom: 14
+    });
 
-    return () => { layers.forEach(l => map.removeLayer(l)); };
-  }, [map, ds, showBell, showRogers, showTelus, otherPids]);
+    vg.on("click", (e: any) => {
+      const p = e.layer?.properties || {};
+      L.popup().setLatLng(e.latlng).setContent(`
+        <b>${p.carrier ?? p.licensee ?? "Unknown"}</b><br/>
+        Tech: ${p.technology ?? "—"}<br/>
+        TX: ${p.tx_mhz ?? "—"} MHz
+      `).openOn(map);
+    });
 
-  return null;
-}
+    vg.addTo(map);
+    return () => vg.remove();
+  }, [map, carriers, techs]);
 
-function ClickHandler() {
-  const map = useMap();
-  const { ds, showBell, showRogers, showTelus, otherPids } = useMapStore();
-
-  useMapEvents({
-    click: async (e) => {
-      const params = new URLSearchParams({
-        lat: String(e.latlng.lat),
-        lng: String(e.latlng.lng),
-        zoom: String(map.getZoom()),
-        ds
-      });
-      if (showBell) params.append("pid[]", "1");
-      if (showRogers) params.append("pid[]", "3");
-      if (showTelus) params.append("pid[]", "4");
-      otherPids.forEach(pid => params.append("pid[]", pid));
-
-      const r = await fetch(`/api/point?${params.toString()}`);
-      const html = await r.text();
-      L.popup().setLatLng(e.latlng).setContent(html).openOn(map);
-    }
-  });
-  return null;
-}
-
-function ResizeOnReadyAndSidebar() {
-  const map = useMap();
-  const { sidebarOpen } = useMapStore();
-  useEffect(() => {
-    map.whenReady(() => requestAnimationFrame(() => map.invalidateSize()));
-    const onResize = () => map.invalidateSize();
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, [map]);
-  useEffect(() => {
-    setTimeout(() => map.invalidateSize(), 350);
-  }, [sidebarOpen, map]);
+  useEffect(() => { setTimeout(()=>map.invalidateSize(), 350); }, [sidebarOpen, map]);
   return null;
 }
 
 export default function MapView() {
   return (
-    <MapContainer
-      center={[45.4, -75.7]}
-      zoom={5}
-      className="h-[calc(100dvh-64px)] w-full"
-      zoomControl={true}
-      preferCanvas={true}
-      fadeAnimation={true}
-      zoomAnimation={true}
-      markerZoomAnimation={true}
-    >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        crossOrigin={true}
-        updateWhenIdle={false}
-        updateWhenZooming={true}
-        keepBuffer={3}
-      />
-      <Overlays />
-      <ClickHandler />
-      <ResizeOnReadyAndSidebar />
+    <MapContainer center={[56,-96]} zoom={4} className="h-[calc(100dvh-84px)] w-full" preferCanvas>
+      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution='&copy; OpenStreetMap contributors' />
+      <SitesLayer />
     </MapContainer>
   );
 }
