@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
     headers: {
       "Content-Type": "image/png",
       "Cache-Control": "public, max-age=60",
-      **headers
+      ...headers
     }
   });
 }
