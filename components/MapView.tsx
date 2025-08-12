@@ -81,42 +81,45 @@ function useViewportFeatures(map: any, carriers: string[], techs: string[]){
     const ac = new AbortController();
     ctrl.current = ac;
 
-    (async () => {
-      const zoom = map.getZoom();
-      const z = Math.max(5, Math.min(14, Math.round(zoom)));
-      // tiles covering bbox
-      const gj = { type: "Polygon", coordinates: [[[west, south],[east, south],[east, north],[west, north],[west, south]]] } as any;
-      const tiles = cover.tiles(gj, { min_zoom: z, max_zoom: z }) as [number,number,number][];
-      const results: Feature[] = [];
-      for(const t of tiles){
-        const [x,y] = t;
-        try {
-          const buf = await fetchTile(z,x,y, ac.signal);
-          if(!buf) continue;
-          const feats = decodeFeatures(buf, x, y, z);
-          results.push(...feats);
-        } catch {}
-      }
+    
+(async () => {
+  const zoom = map.getZoom();
+  const z = Math.max(5, Math.min(14, Math.round(zoom)));
+  if (!bbox) return;
+  const [west, south, east, north] = bbox;
 
-      // filter by bbox again (tile decode can include edges) + by carrier/tech
-      const [west,south,east,north] = bbox!;
-      const carriersL = carriers.map(c=>c.toLowerCase());
-      const techsL = techs.map(t=>t.toLowerCase());
-      const filtered = results.filter(f => {
-        const [lng, lat] = f.geometry.coordinates;
-        if(lng < west || lng > east || lat < south || lat > north) return false;
-        const props = f.properties || {};
-        const carrier = String(props.carrier || props.operator || "").toLowerCase();
-        const tech = String(props.technology || props.tech || "").toLowerCase();
-        if(carriersL.length && !carriersL.some(c => carrier.includes(c))) return false;
-        if(techsL.length && !techsL.some(t => tech.includes(t))) return false;
-        return true;
-      });
+  // tiles covering bbox (single-zoom cover)
+  const gj: any = { type: "Polygon", coordinates: [[[west, south],[east, south],[east, north],[west, north],[west, south]]] };
+  const tiles = cover.tiles(gj, { min_zoom: z, max_zoom: z }) as [number,number,number][];
 
-      setFeatures(filtered);
-    })();
+  const results: Feature[] = [];
+  for (const t of tiles) {
+    const [x, y] = t;
+    try {
+      const buf = await fetchTile(z, x, y, ac.signal);
+      if (!buf) continue;
+      const feats = decodeFeatures(buf, x, y, z);
+      results.push(...feats);
+    } catch {}
+  }
 
-    return () => ac.abort();
+  // filter to bbox + user filters
+  const carriersL = carriers.map(c=>c.toLowerCase());
+  const techsL = techs.map(t=>t.toLowerCase());
+  const filtered = results.filter(f => {
+    const [lng, lat] = f.geometry.coordinates;
+    if (lng < west || lng > east || lat < south || lat > north) return false;
+    const props = f.properties || {};
+    const carrier = String(props.carrier || props.operator || "").toLowerCase();
+    const tech = String(props.technology || props.tech || "").toLowerCase();
+    if (carriersL.length && !carriersL.some(c => carrier.includes(c))) return false;
+    if (techsL.length && !techsL.some(t => tech.includes(t))) return false;
+    return true;
+  });
+
+  setFeatures(filtered);
+})();
+return () => ac.abort();
   }, [bbox?.join(","), map, carriers.join(","), techs.join(",")]);
 
   return { bbox, features };
