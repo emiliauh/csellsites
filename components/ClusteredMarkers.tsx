@@ -122,7 +122,7 @@ export default function ClusteredMarkers({ features, zoom }: Props){
 
       return (
         <Marker key={`pt-${i}`} position={[lat, lng]}>
-          <Popup minWidth={300} maxWidth={420}>
+          <Popup {...({ minWidth: 300, maxWidth: 420 } as any)}>
             <div className="text-sm space-y-1">
               <div className="font-semibold text-base">{name}</div>
               {area && <div className="text-xs opacity-80 -mt-0.5">{area}</div>}
