@@ -10,7 +10,7 @@ import { useMapStore } from "@/lib/store";
 import Supercluster from "supercluster";
 import { VectorTile } from "@mapbox/vector-tile";
 import Protobuf from "pbf";
-import tilebelt from "@mapbox/tilebelt";
+import * as tilebelt from "@mapbox/tilebelt";
 import ClusteredMarkers from "./ClusteredMarkers";
 import { getTile, setTile } from "@/lib/tileCache";
 
