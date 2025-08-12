@@ -1,9 +1,7 @@
 "use client";
-import dynamic from "next/dynamic";
 import { MapContainer, TileLayer, useMap } from "react-leaflet";
 const MapAny: any = MapContainer;
 const TileAny: any = TileLayer;
-const MapAny: any = MapContainer;
 import L from "leaflet";
 import "leaflet.vectorgrid";
 import { useEffect } from "react";
@@ -43,11 +41,9 @@ function SitesLayer() {
 
     vg.on("click", (e: any) => {
       const p = e.layer?.properties || {};
-      L.popup().setLatLng(e.latlng).setContent(`
-        <b>${p.carrier ?? p.licensee ?? "Unknown"}</b><br/>
-        Tech: ${p.technology ?? "—"}<br/>
-        TX: ${p.tx_mhz ?? "—"} MHz
-      `).openOn(map);
+      L.popup().setLatLng(e.latlng).setContent(
+        `<b>${p.carrier ?? p.licensee ?? "Unknown"}</b><br/>Tech: ${p.technology ?? "—"}<br/>TX: ${p.tx_mhz ?? "—"} MHz`
+      ).openOn(map);
     });
 
     vg.addTo(map);
@@ -61,8 +57,7 @@ function SitesLayer() {
 export default function MapView() {
   return (
     <MapAny center={[56,-96]} zoom={4} className="h-[calc(100dvh-84px)] w-full" preferCanvas>
-      <TileAny url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        attribution='&copy; OpenStreetMap contributors' />
+      <TileAny url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
       <SitesLayer />
     </MapAny>
   );
